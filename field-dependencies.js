@@ -76,20 +76,27 @@ var FieldDependencies = (function() {
         }
     };
 
+    /**
+     * Define what part of the $element to use as the key in the Element container
+     *
+     * @param $element
+     * @returns {*}
+     */
     this.getElementKey = function ($element) {
-        
+        return $element.attr('id');
     };
 
     /**
      * A key/object store for Elements
      */
-    this.elementsContainer = (function() {
+    this.elementsContainer = (function(getElementKey) {
         this.elements = {};
+        this.getElementKey = getElementKey;
 
         this.get = function ($element) {
-            var guid = $element.attr('data-guid');
-            if (this.elements.hasOwnProperty(guid)) {
-                return this.elements[guid];
+            var key = this.getElementKey($element);
+            if (this.elements.hasOwnProperty(key)) {
+                return this.elements[key];
             }
         };
 
@@ -107,14 +114,15 @@ var FieldDependencies = (function() {
                 var element = that.get($element);
 
                 if (!element) {
+                    var key = that.getElementKey($element);
                     element = new Element($element);
-                    that.elements[$element.attr('data-guid')] = element;
+                    that.elements[key] = element;
                 }
 
                 return element;
             }
         }
-    })();
+    })(this.getElementKey);
 
     /**
      * @param $element
@@ -264,6 +272,10 @@ var FieldDependencies = (function() {
         },
         createDependency: function($pubElem, pubStateName, $subElem, subModifierName) {
             that.createDependency($pubElem, pubStateName, $subElem, subModifierName);
+        },
+
+        setElementKeyCallback: function (callback) {
+            that.getElementKey = callback;
         },
 
         getThat: function () {
