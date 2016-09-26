@@ -1,30 +1,5 @@
-/**
- *          Pub Elem ----------------------> State (active/inactive)
- *                            has               | publisher
- *                                              |
- *                                              | notifies (when State is active)
- *                                              |
- *                          modifies            | subscriber
- *          Sub Elem <---------------------- Modifier
- *
- */
-
-/**
- *       An element can either be a
- *            Pub (dependency)
- *            Sub (dependent)
- *
- *       A pub element has multiple states, each either active or inactive
- *
- *       An active state will notify an attached modifier
- *
- *       The notified modifier will modify the Sub element
- */
-
-var FieldDependencies = (function ($) {
+var FieldDependencies = (function () {
     var that = this;
-
-    this.dependenciesContainer = {};
 
     /**
      * A key/object store for States
@@ -136,22 +111,23 @@ var FieldDependencies = (function ($) {
         this.states = {};
         this.modifiers = {};
 
-        // whenever the DOM $element changes, have all the active State objects notify their listening Modifiers
+        // whenever the dependency DOM $element changes, have all the active State objects notify their subscribing Modifiers
         var self = this;
-        var modifySubscribers = function () {
+        var modifyDependents = function () {
             var activeStates = self.getActiveStates();
-            console.log(activeStates);
             for(var i in activeStates) {
-                if (activeStates[i].hasOwnProperty('notify')) {
-                    activeStates[i].notify();
+                if (activeStates[i].hasOwnProperty('publish')) {
+                    activeStates[i].publish();
                 }
             }
         };
-        this.$element.change(modifySubscribers);
+        this.$element.change(modifyDependents);
 
-
-        this.modifySubscribers = function () {
-            modifySubscribers();
+        /**
+         * Called when cascading
+         */
+        this.modifyDependents = function () {
+            modifyDependents();
         };
 
         /**
@@ -186,10 +162,9 @@ var FieldDependencies = (function ($) {
     }
 
     /**
-     * Represents the state of Element evaluated by a callback function
-     * Can have one or more Modifiers listening to when it is active
+     * Represents the state of a dependency Element
      *
-     * @param callback
+     * @param callback The function used to evaluate if the state is active
      * @constructor
      */
     function State(callback) {
@@ -198,28 +173,46 @@ var FieldDependencies = (function ($) {
         this.modifiers = [];
 
         /**
-         * Notify all attached modifiers to modify their element
+         * Notify subscribing modifiers to modify their element
          */
-        this.notify = function () {
+        this.publish = function () {
             for (var i in this.modifiers) {
                 this.modifiers[i].execute();
             }
         };
+
+        /**
+         * Is the dependency Element in this state?
+         *
+         * @return {*}
+         */
         this.isActive = function () {
             return this.callback(this.element.$element);
         };
+
+        /**
+         * Set the dependency Element
+         *
+         * @param element
+         * @return {State}
+         */
         this.setElement = function (element) {
             this.element = element;
             return this;
         };
+
+        /**
+         * Add the Modifier to a subscriber list
+         *
+         * @param modifier
+         */
         this.addModifier = function (modifier) {
             this.modifiers.push(modifier);
         };
     }
 
     /**
-     * Modifies an Element via its callback function when any of its attached states are active
-     * Listens to one or more States for their when they are active
+     * Modifies a dependent Element upon one or more State changes.
      *
      * @param callback
      * @constructor
@@ -235,17 +228,30 @@ var FieldDependencies = (function ($) {
          * @returns {*}
          */
         this.execute = function () {
-            // the element is a subscriber, so perform a callback on it to modify it
+            // the element is a dependent, so perform a callback on it to modify it
             this.callback(this.element.$element);
 
-            // the element might also be a publisher, so do the same to its subscribers (cascade)
-            this.element.modifySubscribers();
+            // the element might also be a dependency, so do the same to its dependents (cascade)
+            this.element.modifyDependents();
         };
+
+        /**
+         * Set the dependent Element
+         * 
+         * @param element
+         * @return {Modifier}
+         */
         this.setElement = function (element) {
             this.element = element;
             return this;
         };
-        this.listen = function (state) {
+
+        /**
+         * Subscribe to a State
+         * 
+         * @param state
+         */
+        this.subscribe = function (state) {
             state.addModifier(this);
             this.states.push(state);
         }
@@ -272,13 +278,13 @@ var FieldDependencies = (function ($) {
 
         var pubState = pubElem.getState(pubStateName);
         var subModifier = subElem.getModifier(subModifierName);
-        subModifier.listen(pubState);
+        subModifier.subscribe(pubState);
 
         if (inheritState) {
             if (pubElem.getModifier(subModifierName)) {
                 var cascadingStates = pubElem.getModifier(subModifierName).states;
                 for (var key in cascadingStates) {
-                    subModifier.listen(cascadingStates[key]);
+                    subModifier.subscribe(cascadingStates[key]);
                 }
             }
         }
@@ -297,13 +303,13 @@ var FieldDependencies = (function ($) {
 
         setElementKeyCallback: function (callback) {
             that.getElementKey = callback;
-        },
-
-        getThat: function () {
-            return {
-                'elementsContainer': that.elementsContainer,
-                'statesContainer': that.statesContainer
-            }
         }
+
+        // ,getThat: function () {
+        //     return {
+        //         'elementsContainer': that.elementsContainer,
+        //         'statesContainer': that.statesContainer
+        //     }
+        // }
     }
-})($);
+})();
