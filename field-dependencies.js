@@ -21,8 +21,10 @@
  *       The notified modifier will modify the Sub element
  */
 
-var FieldDependencies = (function() {
+var FieldDependencies = (function ($) {
     var that = this;
+
+    this.dependenciesContainer = {};
 
     /**
      * A key/object store for States
@@ -89,7 +91,7 @@ var FieldDependencies = (function() {
     /**
      * A key/object store for Elements
      */
-    this.elementsContainer = (function(getElementKey) {
+    this.elementsContainer = (function (getElementKey) {
         this.elements = {};
         this.getElementKey = getElementKey;
 
@@ -136,7 +138,7 @@ var FieldDependencies = (function() {
 
         // whenever the DOM $element changes, have all the active State objects notify their listening Modifiers
         var self = this;
-        this.$element.change(function (event) {
+        var modifySubscribers = function () {
             var activeStates = self.getActiveStates();
             console.log(activeStates);
             for(var i in activeStates) {
@@ -144,7 +146,13 @@ var FieldDependencies = (function() {
                     activeStates[i].notify();
                 }
             }
-        }).bind(self);
+        };
+        this.$element.change(modifySubscribers);
+
+
+        this.modifySubscribers = function () {
+            modifySubscribers();
+        };
 
         /**
          * Return a key/State object-literal of the active states
@@ -154,8 +162,8 @@ var FieldDependencies = (function() {
         this.getActiveStates = function () {
             var activeStates = {};
             var states = this.states;
-            for(var i in states) {
-                if(states[i].hasOwnProperty('isActive') && states[i].isActive()) {
+            for (var i in states) {
+                if (states[i].hasOwnProperty('isActive') && states[i].isActive()) {
                     activeStates[i] = states[i];
                 }
             }
@@ -200,11 +208,11 @@ var FieldDependencies = (function() {
         this.isActive = function () {
             return this.callback(this.element.$element);
         };
-        this.setElement = function(element) {
+        this.setElement = function (element) {
             this.element = element;
             return this;
         };
-        this.addModifier = function(modifier) {
+        this.addModifier = function (modifier) {
             this.modifiers.push(modifier);
         };
     }
@@ -222,14 +230,18 @@ var FieldDependencies = (function() {
         this.states = [];
 
         /**
-         * Execute the modification on the element
+         * Execute the modification on the element and cascade
          *
          * @returns {*}
          */
         this.execute = function () {
-            return this.callback(this.element.$element);
+            // the element is a subscriber, so perform a callback on it to modify it
+            this.callback(this.element.$element);
+
+            // the element might also be a publisher, so do the same to its subscribers (cascade)
+            this.element.modifySubscribers();
         };
-        this.setElement = function(element) {
+        this.setElement = function (element) {
             this.element = element;
             return this;
         };
@@ -244,34 +256,43 @@ var FieldDependencies = (function() {
      * @param pubStateName
      * @param $subElem
      * @param subModifierName
+     * @param inheritState
      */
-    this.createDependency = function($pubElem, pubStateName, $subElem, subModifierName) {
+    this.createDependency = function ($pubElem, pubStateName, $subElem, subModifierName, inheritState) {
         var pubElem = that.elementsContainer.resolve($pubElem);
 
         if (!pubElem.getState(pubStateName)) {
-            pubElem.attachState(pubStateName, that.statesContainer.get(pubStateName) );
+            pubElem.attachState(pubStateName, that.statesContainer.get(pubStateName));
         }
 
         var subElem = that.elementsContainer.resolve($subElem);
         if (!subElem.getModifier(subModifierName)) {
-            subElem.attachModifier(subModifierName, that.modifiersContainer.get(subModifierName) );
+            subElem.attachModifier(subModifierName, that.modifiersContainer.get(subModifierName));
         }
-
 
         var pubState = pubElem.getState(pubStateName);
         var subModifier = subElem.getModifier(subModifierName);
         subModifier.listen(pubState);
+
+        if (inheritState) {
+            if (pubElem.getModifier(subModifierName)) {
+                var cascadingStates = pubElem.getModifier(subModifierName).states;
+                for (var key in cascadingStates) {
+                    subModifier.listen(cascadingStates[key]);
+                }
+            }
+        }
     };
 
     return {
         addState: function (name, callback) {
             that.statesContainer.add(name, new State(callback));
         },
-        addModifier: function(name, callback) {
+        addModifier: function (name, callback) {
             that.modifiersContainer.add(name, new Modifier(callback));
         },
-        createDependency: function($pubElem, pubStateName, $subElem, subModifierName) {
-            that.createDependency($pubElem, pubStateName, $subElem, subModifierName);
+        createDependency: function ($pubElem, pubStateName, $subElem, subModifierName, doNotInherit) {
+            that.createDependency($pubElem, pubStateName, $subElem, subModifierName, doNotInherit);
         },
 
         setElementKeyCallback: function (callback) {
@@ -279,10 +300,10 @@ var FieldDependencies = (function() {
         },
 
         getThat: function () {
-            return [
-                that.elementsContainer,
-                that.statesContainer
-            ];
+            return {
+                'elementsContainer': that.elementsContainer,
+                'statesContainer': that.statesContainer
+            }
         }
     }
-})();
+})($);
