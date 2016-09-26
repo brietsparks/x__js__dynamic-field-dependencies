@@ -258,31 +258,39 @@ var FieldDependencies = (function () {
     }
 
     /**
-     * @param $pubElem
-     * @param pubStateName
-     * @param $subElem
-     * @param subModifierName
+     * Set up a relationship between a dependency and dependent element so that the
+     * dependent element undergoes the given modification when the dependency element
+     * is in the given state.
+     *
+     * @param $dependencyElement
+     * @param dependencyStateName
+     * @param $dependentElement
+     * @param dependentModifierName
      * @param inheritState
      */
-    this.createDependency = function ($pubElem, pubStateName, $subElem, subModifierName, inheritState) {
-        var pubElem = that.elementsContainer.resolve($pubElem);
+    this.createRelationship = function (
+        $dependencyElement, dependencyStateName, 
+        $dependentElement, dependentModifierName, 
+        inheritState
+    ) {
+        var dependencyElement = that.elementsContainer.resolve($dependencyElement);
 
-        if (!pubElem.getState(pubStateName)) {
-            pubElem.attachState(pubStateName, that.statesContainer.get(pubStateName));
+        if (!dependencyElement.getState(dependencyStateName)) {
+            dependencyElement.attachState(dependencyStateName, that.statesContainer.get(dependencyStateName));
         }
 
-        var subElem = that.elementsContainer.resolve($subElem);
-        if (!subElem.getModifier(subModifierName)) {
-            subElem.attachModifier(subModifierName, that.modifiersContainer.get(subModifierName));
+        var dependentElement = that.elementsContainer.resolve($dependentElement);
+        if (!dependentElement.getModifier(dependentModifierName)) {
+            dependentElement.attachModifier(dependentModifierName, that.modifiersContainer.get(dependentModifierName));
         }
 
-        var pubState = pubElem.getState(pubStateName);
-        var subModifier = subElem.getModifier(subModifierName);
+        var pubState = dependencyElement.getState(dependencyStateName);
+        var subModifier = dependentElement.getModifier(dependentModifierName);
         subModifier.subscribe(pubState);
 
         if (inheritState) {
-            if (pubElem.getModifier(subModifierName)) {
-                var cascadingStates = pubElem.getModifier(subModifierName).states;
+            if (dependencyElement.getModifier(dependentModifierName)) {
+                var cascadingStates = dependencyElement.getModifier(dependentModifierName).states;
                 for (var key in cascadingStates) {
                     subModifier.subscribe(cascadingStates[key]);
                 }
@@ -297,10 +305,9 @@ var FieldDependencies = (function () {
         addModifier: function (name, callback) {
             that.modifiersContainer.add(name, new Modifier(callback));
         },
-        createDependency: function ($pubElem, pubStateName, $subElem, subModifierName, doNotInherit) {
-            that.createDependency($pubElem, pubStateName, $subElem, subModifierName, doNotInherit);
+        createRelationship: function ($dependencyElement, dependencyStateName, $dependentElement, dependentModifierName, doNotInherit) {
+            that.createRelationship($dependencyElement, dependencyStateName, $dependentElement, dependentModifierName, doNotInherit);
         },
-
         setElementKeyCallback: function (callback) {
             that.getElementKey = callback;
         }
